@@ -1,0 +1,31 @@
+name: CI Pipeline for Varta-ChatApp
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v3
+
+      - name: Docker login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build backend
+        run: docker build -t nishika10/chatapp-backend:latest ./backend
+
+      - name: Build frontend
+        run: docker build -t nishika10/chatapp-frontend:latest ./frontend
+
+      - name: Push backend
+        run: docker push nishika10/chatapp-backend:latest
+
+      - name: Push frontend
+        run: docker push nishika10/chatapp-frontend:latest
