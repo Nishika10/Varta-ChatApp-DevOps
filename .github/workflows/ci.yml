@@ -10,15 +10,27 @@ jobs:
 
     steps:
       - name: Code checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  
+        with:
+          fetch-depth: 0  # full history, not just last commit
 
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v8.1.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # scan source code before even building
       - name: Trivy filesystem scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
           severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
+          ignore-unfixed: true   #skip vulns which have no fix available
+          format: 'template'     # use a template instead of plain text
+          template: '@/contrib/html.tpl'   # trivy's built-in html template
+          output: 'trivy-fs-report.html'   # save output to this file
+          exit-code: '0'  # 0 so pipeline doesn't die before report uploads if found vulns
 
       - name: Docker login
         uses: docker/login-action@v3
@@ -32,6 +44,7 @@ jobs:
       - name: Build frontend
         run: docker build -t nishika10/chatapp-frontend:latest ./frontend
 
+      # image scan catches base image vulnerabilities that fs scan misses
       - name: Trivy image scan backend
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -39,17 +52,36 @@ jobs:
           image-ref: 'nishika10/chatapp-backend:latest'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
+          format: 'template'
+          template: '@/contrib/html.tpl'
+          output: 'trivy-backend-report.html'
+          exit-code: '0'
 
-      - name: Trivy image scan frontend
+      - name: Trivy image scan frontend # separate Trivy image scan steps for both the frontend and backend images
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'image'
           image-ref: 'nishika10/chatapp-frontend:latest'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
+          format: 'template'
+          template: '@/contrib/html.tpl'
+          output: 'trivy-frontend-report.html'
+          exit-code: '0'
 
+      # all scans done, safe to push
       - name: Push backend
         run: docker push nishika10/chatapp-backend:latest
 
       - name: Push frontend
         run: docker push nishika10/chatapp-frontend:latest
+
+      - name: Upload Trivy reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: Trivy-Security-Reports
+          path: |     # | means multiple files below
+            trivy-fs-report.html
+            trivy-backend-report.html
+            trivy-frontend-report.html
+          retention-days: 7      # auto-deleted after 7 days from github
