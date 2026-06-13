@@ -19,6 +19,13 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
+
+      - name: Download Trivy HTML Template # first download then use otherwise html.tpl file not found error
+        run: |  # multiple commands below
+          mkdir -p trivy-templates
+          wget -O trivy-templates/html.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+    
+
       # scan source code before even building
       - name: Trivy filesystem scan
         uses: aquasecurity/trivy-action@v0.36.0
@@ -28,9 +35,9 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true   #skip vulns which have no fix available
           format: 'template'     # use a template instead of plain text
-          template: '@/contrib/html.tpl'   # trivy's built-in html template
+          template: '@trivy-templates/html.tpl'   # trivy's built-in html template
           output: 'trivy-fs-report.html'   # save output to this file
-          exit-code: '0'  # 0 so pipeline doesn't die before report uploads if found vulns
+          exit-code: '1'  # 1 to stop the pipeline if vulns found and can do '0' so pipeline doesn't die before report uploads if found vulns and
 
       - name: Docker login
         uses: docker/login-action@v3
@@ -53,9 +60,9 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
           format: 'template'
-          template: '@/contrib/html.tpl'
+          template: '@trivy-templates/html.tpl'
           output: 'trivy-backend-report.html'
-          exit-code: '0'
+          exit-code: '1'
 
       - name: Trivy image scan frontend # separate Trivy image scan steps for both the frontend and backend images
         uses: aquasecurity/trivy-action@v0.36.0
@@ -65,9 +72,9 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
           format: 'template'
-          template: '@/contrib/html.tpl'
+          template: '@trivy-templates/html.tpl'
           output: 'trivy-frontend-report.html'
-          exit-code: '0'
+          exit-code: '1'
 
       # all scans done, safe to push
       - name: Push backend
@@ -78,6 +85,7 @@ jobs:
 
       - name: Upload Trivy reports
         uses: actions/upload-artifact@v4
+        if: always() # Ensures report is uploaded even if vulnerabilities are found or the pipeline stopped by exit-code: 1 
         with:
           name: Trivy-Security-Reports
           path: |     # | means multiple files below
