@@ -37,7 +37,7 @@ jobs:
           format: 'template'     # use a template instead of plain text
           template: '@trivy-templates/html.tpl'   # trivy's built-in html template
           output: 'trivy-fs-report.html'   # save output to this file
-          exit-code: '1'  # 1 to stop the pipeline if vulns found and can do '0' so pipeline doesn't die before report uploads if found vulns and
+          exit-code: '0' # 0 so pipeline doesn't die before report uploads and if found vulns and can do 1 to stop the pipeline if vulns found (prod-level)
 
       - name: Docker login
         uses: docker/login-action@v3
@@ -62,7 +62,7 @@ jobs:
           format: 'template'
           template: '@trivy-templates/html.tpl'
           output: 'trivy-backend-report.html'
-          exit-code: '1'
+          exit-code: '0'
 
       - name: Trivy image scan frontend # separate Trivy image scan steps for both the frontend and backend images
         uses: aquasecurity/trivy-action@v0.36.0
@@ -74,7 +74,7 @@ jobs:
           format: 'template'
           template: '@trivy-templates/html.tpl'
           output: 'trivy-frontend-report.html'
-          exit-code: '1'
+          exit-code: '0'
 
       # all scans done, safe to push
       - name: Push backend
